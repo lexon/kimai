@@ -819,10 +819,8 @@ class MySQLDatabaseLayer extends DatabaseLayer {
               $return_grps[$counter] = $current_grp['pct_ID'];
               $counter++;
           }
-          return $return_grps;
-      } else {
-          return false;
       }
+      return $return_grps;
   }
 
   /**
@@ -1921,7 +1919,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
   * @FIXME alex - 	the $data of zef_create_record & zef_edit_record are hell different, WHY, WHY, WHY?
   * 				to keep the API clean, added new function => zef_add_record
   */
-  public function zef_create_record($usr_ID, $data) {
+  public function zef_create_record($data) {
       $data = $this->clean_data($data);
 
       $values ['zef_location']     =   MySQL::SQLValue( $data ['zlocation'] );
@@ -1931,7 +1929,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
         $values ['zef_trackingnr'] = 'NULL';
       else
         $values ['zef_trackingnr'] =   MySQL::SQLValue( $data ['trackingnr'] );
-      $values ['zef_usrID']        =   MySQL::SQLValue( $usr_ID                , MySQL::SQLVALUE_NUMBER );
+      $values ['zef_usrID']        =   MySQL::SQLValue( $data ['zef_usrID']       , MySQL::SQLVALUE_NUMBER );
       $values ['zef_pctID']        =   MySQL::SQLValue( $data ['pct_ID']       , MySQL::SQLVALUE_NUMBER );
       $values ['zef_evtID']        =   MySQL::SQLValue( $data ['evt_ID']       , MySQL::SQLVALUE_NUMBER );
       $values ['zef_comment_type'] =   MySQL::SQLValue( $data ['comment_type'] , MySQL::SQLVALUE_NUMBER );
@@ -1995,6 +1993,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
         $values ['zef_trackingnr'] = 'NULL';
       else
         $values ['zef_trackingnr'] = MySQL::SQLValue($new_array ['zef_trackingnr']                             );
+      $values ['zef_usrID']        = MySQL::SQLValue($new_array ['zef_usrID']         , MySQL::SQLVALUE_NUMBER );
       $values ['zef_pctID']        = MySQL::SQLValue($new_array ['zef_pctID']         , MySQL::SQLVALUE_NUMBER );
       $values ['zef_evtID']        = MySQL::SQLValue($new_array ['zef_evtID']         , MySQL::SQLVALUE_NUMBER );
       $values ['zef_comment_type'] = MySQL::SQLValue($new_array ['zef_comment_type']  , MySQL::SQLVALUE_NUMBER );
@@ -2321,21 +2320,19 @@ class MySQLDatabaseLayer extends DatabaseLayer {
           while (! $this->conn->EndOfSeek()) {
               $row = $this->conn->Row();
               $arr[$i]['zef_ID']           = $row->zef_ID;
-              if ($row->zef_in <= $in && $row->zef_out < $out)  {
-                $arr[$i]['zef_in']         = $in;
-                $arr[$i]['zef_out']        = $row->zef_out;
+
+              // Start time should not be less than the selected start time. This would confuse the user.
+              if ($in && $row->zef_in <= $in)  {
+                $arr[$i]['zef_in'] = $in;
+              } else {
+                $arr[$i]['zef_in'] = $row->zef_in;
               }
-              else if ($row->zef_in <= $in && $row->zef_out >= $out)  {
-                $arr[$i]['zef_in']         = $in;
-                $arr[$i]['zef_out']        = $out;
-              }
-              else if ($row->zef_in > $in && $row->zef_out < $out)  {
-                $arr[$i]['zef_in']         = $row->zef_in;
-                $arr[$i]['zef_out']        = $row->zef_out;
-              }
-              else if ($row->zef_in > $in && $row->zef_out >= $out)  {
-                $arr[$i]['zef_in']         = $row->zef_in;
-                $arr[$i]['zef_out']        = $out;
+
+              // End time should not be less than the selected start time. This would confuse the user.
+              if ($out && $row->zef_out >= $out)  {
+                $arr[$i]['zef_out'] = $out;
+              } else {
+                $arr[$i]['zef_out'] = $row->zef_out;
               }
 
               if ($row->zef_out != 0) {
@@ -2498,7 +2495,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
     $this->conn->MoveFirst();
     while (! $this->conn->EndOfSeek()) {
         $row = $this->conn->Row();
-        $this->kga['conf']['status'][] = $row->status;
+        $this->kga['conf']['status'][$row->status_id] = $row->status;
     }
   }
 
@@ -3017,13 +3014,10 @@ class MySQLDatabaseLayer extends DatabaseLayer {
   /**
    * return status names
    * @param integer $statusIds
-    * @FIXME kpapst - here we fetch the description of the entries which are already known
-    *                 SELECT status from status WHERE status in ('open') - doesn't make
-    *                 really sense, only the values will be ordered
    */
-    public function get_status($statusIds) {
-  	  $p = $this->kga['server_prefix'];
-  	  $statusIds = implode(',', $statusIds);
+  public function get_status($statusIds) {
+      $p = $this->kga['server_prefix'];
+      $statusIds = implode(',', $statusIds);
       $query = "SELECT status FROM ${p}status where status_id in ( $statusIds ) order by status_id";
       $result = $this->conn->Query($query);
       if ($result == false) {
@@ -3037,13 +3031,13 @@ class MySQLDatabaseLayer extends DatabaseLayer {
       }
       return $res;
   }
-
-    /**
-  * returns array of all status with the status id as key
-  *
-  * @return array
-  * @author mo
-  */
+      
+  /**
+   * returns array of all status with the status id as key
+   *
+   * @return array
+   * @author mo
+   */
   public function get_arr_status() {
       $p = $this->kga['server_prefix'];
 

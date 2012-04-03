@@ -1953,7 +1953,7 @@ class PDODatabaseLayer extends DatabaseLayer
     * @global array  $this->kga    kimai-global-array
     * @author th
     */
-    public function zef_create_record($usr_ID,$data) {
+    public function zef_create_record($data) {
       $p = $this->kga['server_prefix'];
 
       $pdo_query = $this->conn->prepare("INSERT INTO ${p}zef (
@@ -1988,7 +1988,7 @@ class PDODatabaseLayer extends DatabaseLayer
       (int)$data['in'],
       (int)$data['out'],
       (int)$data['diff'],
-      (int)$usr_ID,
+      (int)$data['zef_usrID'],
       (int)$data['rate'],
       $data['cleared']?1:0,
       (int)$data['budget'],
@@ -2028,6 +2028,7 @@ class PDODatabaseLayer extends DatabaseLayer
       }
 
       $pdo_query = $this->conn->prepare("UPDATE ${p}zef SET
+      zef_usrID = ?,
       zef_pctID = ?,
       zef_evtID = ?,
       zef_location = ?,
@@ -2048,6 +2049,7 @@ class PDODatabaseLayer extends DatabaseLayer
       WHERE zef_ID = ?;");
 
       $result = $pdo_query->execute(array(
+      (int)$new_array['zef_usrID'],
       (int)$new_array['zef_pctID'],
       (int)$new_array['zef_evtID'] ,
       $new_array['zef_location'],
@@ -2341,21 +2343,19 @@ class PDODatabaseLayer extends DatabaseLayer
       /* TODO: needs revision as foreach loop */
       while ($row = $pdo_query->fetch(PDO::FETCH_ASSOC)) {
           $arr[$i]['zef_ID']           = $row['zef_ID'];
-          if ($row['zef_in'] <= $in && $row['zef_out'] < $out)  {
-            $arr[$i]['zef_in']            = $in;
-            $arr[$i]['zef_out']          = $row['zef_out'];
+
+          // Start time should not be less than the selected start time. This would confuse the user.
+          if ($in && $row['zef_in'] <= $in)  {
+            $arr[$i]['zef_in'] = $in;
+          } else {
+            $arr[$i]['zef_in'] = $row['zef_in'];
           }
-          else if ($row['zef_in'] <= $in && $row['zef_out'] >= $out)  {
-            $arr[$i]['zef_in']            = $in;
-            $arr[$i]['zef_out']          = $out;
-          }
-          else if ($row['zef_in'] > $in && $row['zef_out'] < $out)  {
-            $arr[$i]['zef_in']            = $row['zef_in'];
-            $arr[$i]['zef_out']          = $row['zef_out'];
-          }
-          else if ($row['zef_in'] > $in && $row['zef_out'] >= $out)  {
-            $arr[$i]['zef_in']            = $row['zef_in'];
-            $arr[$i]['zef_out']          = $out;
+
+          // End time should not be less than the selected start time. This would confuse the user.
+          if ($out && $row['zef_out'] >= $out)  {
+            $arr[$i]['zef_out'] = $out;
+          } else {
+            $arr[$i]['zef_out'] = $row['zef_out'];
           }
 
           if ($row['zef_out'] != 0) {
@@ -2524,7 +2524,7 @@ class PDODatabaseLayer extends DatabaseLayer
     $row  = $pdo_query->fetch(PDO::FETCH_ASSOC);
 
     do {
-        $this->kga['conf']['status'][] = $row['status'];
+        $this->kga['conf']['status'][$row['status_id']] = $row['status'];
     } while ($row = $pdo_query->fetch(PDO::FETCH_ASSOC));
     }
 
@@ -3426,7 +3426,6 @@ class PDODatabaseLayer extends DatabaseLayer
       return $seq;
     }
 
-
     /**
     * return status names
     * @param integer $statusIds
@@ -3438,17 +3437,20 @@ class PDODatabaseLayer extends DatabaseLayer
       $p = $this->kga['server_prefix'];
       $statusIds = implode(',', $statusIds);
       $pdo_query = $this->conn->prepare("SELECT status FROM ${p}status where status_id in ( $statusIds ) order by status_id");
+
       $result = $pdo_query->execute();
       if ($result == false) {
           $this->logLastError('get_status');
           return false;
       }
 
+      $res = array();
       while($row = $pdo_query->fetch(PDO::FETCH_ASSOC)) {
         $res[] = $row['status'];
       }
       return $res;
     }
+
 
     /**
     * Returns the number of zef with a certain status
@@ -3482,9 +3484,7 @@ class PDODatabaseLayer extends DatabaseLayer
     public function get_arr_status() {
       $p = $this->kga['server_prefix'];
 
-        $query = "SELECT * FROM ${p}status
-        ORDER BY status;";
-
+      $query = "SELECT * FROM ${p}status ORDER BY status;";
       $pdo_query = $this->conn->prepare($query);
       $result = $pdo_query->execute();
 

@@ -40,6 +40,10 @@ class PDODatabaseLayer extends DatabaseLayer
           Logger::logfile('PDO CONNECTION FAILED: ' . $pdo_ex->getMessage());
         }
     }
+	
+	public function getConnection() {
+  		return $this->conn;
+  	}
 
     private function logLastError($scope)
     {
@@ -2035,6 +2039,7 @@ class PDODatabaseLayer extends DatabaseLayer
       zef_out = ?,
       zef_time = ?,
       zef_rate = ?,
+      zef_fixed_rate = ?,
       zef_cleared= ?,
       zef_budget= ?,
       zef_approved= ?,
@@ -2260,7 +2265,7 @@ class PDODatabaseLayer extends DatabaseLayer
     * @return array
     * @author th
     */
-    public function get_arr_zef($in,$out,$users = null, $customers = null, $projects = null, $events = null, $limit = false, $reverse_order = false, $filterCleared = null, $startRows = 0, $limitRows = 0, $countOnly = false) {
+	public function get_arr_zef($in,$out,$users = null, $customers = null, $projects = null, $events = null, $limit = false, $reverse_order = false, $filterCleared = null, $startRows = 0, $limitRows = 0, $countOnly = false) {
       $p = $this->kga['server_prefix'];
 
       if (!is_numeric($filterCleared)) {
@@ -2295,7 +2300,7 @@ class PDODatabaseLayer extends DatabaseLayer
           $limit="";
       }
 		
-      $select = "SELECT zef_ID, zef_in, zef_out, zef_time, zef_rate, zef_budget, zef_approved, status, zef_billable,
+      $select = "SELECT zef_ID, zef_in, zef_out, zef_time, zef_rate, zef_fixed_rate, zef_budget, zef_approved, status, zef_billable,
                        zef_pctID, zef_evtID, zef_usrID, pct_ID, knd_name, pct_kndID, evt_name, pct_comment, pct_name,
                        zef_location, zef_trackingnr, zef_description, zef_comment, zef_comment_type, usr_name, usr_alias, zef_cleared";
       if($countOnly)
@@ -2363,6 +2368,7 @@ class PDODatabaseLayer extends DatabaseLayer
 
 
           $arr[$i]['zef_rate']         = $row['zef_rate'];
+		  $arr[$i]['zef_fixed_rate']   = $row['zef_fixed_rate'];
           $arr[$i]['zef_pctID']        = $row['zef_pctID'];
           $arr[$i]['zef_evtID']        = $row['zef_evtID'];
           $arr[$i]['zef_usrID']        = $row['zef_usrID'];

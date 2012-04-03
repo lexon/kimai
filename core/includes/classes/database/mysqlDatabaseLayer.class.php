@@ -1939,6 +1939,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
       $values ['zef_out']          =   MySQL::SQLValue( $data ['out']          , MySQL::SQLVALUE_NUMBER );
       $values ['zef_time']         =   MySQL::SQLValue( $data ['diff']         , MySQL::SQLVALUE_NUMBER );
       $values ['zef_rate']         =   MySQL::SQLValue( $data ['rate']         , MySQL::SQLVALUE_NUMBER );
+	  $values ['zef_fixed_rate']   =   MySQL::SQLValue( $data ['fixed_rate']   , MySQL::SQLVALUE_NUMBER );
       $values ['zef_cleared']      =   MySQL::SQLValue( $data ['cleared']?1:0  , MySQL::SQLVALUE_NUMBER );
       $values ['zef_budget']   	   =   MySQL::SQLValue($data ['budget']   	   , MySQL::SQLVALUE_NUMBER );
       $values ['zef_approved'] 	   =   MySQL::SQLValue($data ['approved']      , MySQL::SQLVALUE_NUMBER );
@@ -2001,6 +2002,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
       $values ['zef_out']          = MySQL::SQLValue($new_array ['zef_out']           , MySQL::SQLVALUE_NUMBER );
       $values ['zef_time']         = MySQL::SQLValue($new_array ['zef_time']          , MySQL::SQLVALUE_NUMBER );
       $values ['zef_rate']         = MySQL::SQLValue($new_array ['zef_rate']          , MySQL::SQLVALUE_NUMBER );
+	  $values ['zef_fixed_rate']   = MySQL::SQLValue($new_array ['zef_fixed_rate']    , MySQL::SQLVALUE_NUMBER );
       $values ['zef_cleared']      = MySQL::SQLValue($new_array ['zef_cleared']?1:0   , MySQL::SQLVALUE_NUMBER );
       $values ['zef_budget'] 	   = MySQL::SQLValue($new_array ['zef_budget']     	  , MySQL::SQLVALUE_NUMBER );
       $values ['zef_approved'] 	   = MySQL::SQLValue($new_array ['zef_approved']  	  , MySQL::SQLVALUE_NUMBER );
@@ -2232,13 +2234,9 @@ class MySQLDatabaseLayer extends DatabaseLayer {
       return $whereClauses;
   }
 
-  /**
+ /**
   * returns timesheet for specific user as multidimensional array
-<<<<<<< HEAD
   * @TODO: needs new comments
-=======
-  *@TODO: needs new comments
->>>>>>> origin/master
   * @param integer $user ID of user in table usr
   * @param integer $in start of timespace in unix seconds
   * @param integer $out end of timespace in unix seconds
@@ -2272,13 +2270,10 @@ class MySQLDatabaseLayer extends DatabaseLayer {
         $whereClauses[] = "zef_cleared = $filterCleared";
       
       if ($limit) {
-		if(!empty($limitRows))
-		{
+		if(!empty($limitRows)) {
 			$startRows = (int)$startRows;
       	  	$limit = "LIMIT $startRows, $limitRows";
-		} 
-		else 
-		{
+		} else {
 			if (isset($this->kga['conf']['rowlimit'])) {
 				$limit = "LIMIT " .$this->kga['conf']['rowlimit'];
 			} else {
@@ -2290,7 +2285,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
       }
       
       
-      $select = "SELECT zef_ID, zef_in, zef_out, zef_time, zef_rate, zef_budget, zef_approved, status, zef_billable,
+      $select = "SELECT zef_ID, zef_in, zef_out, zef_time, zef_rate, zef_fixed_rate, zef_budget, zef_approved, status, zef_billable,
                        zef_pctID, zef_evtID, zef_usrID, pct_ID, knd_name, pct_kndID, evt_name, pct_comment, pct_name,
                        zef_location, zef_trackingnr, zef_description, zef_comment, zef_comment_type, usr_name, usr_alias, zef_cleared";
       
@@ -2353,6 +2348,7 @@ class MySQLDatabaseLayer extends DatabaseLayer {
               $arr[$i]['zef_budget']   	   = $row->zef_budget;
               $arr[$i]['zef_approved']     = $row->zef_approved;
               $arr[$i]['zef_rate']         = $row->zef_rate;
+			  $arr[$i]['zef_fixed_rate']   = $row->zef_fixed_rate;
               $arr[$i]['zef_pctID']        = $row->zef_pctID;
               $arr[$i]['zef_evtID']        = $row->zef_evtID;
               $arr[$i]['zef_usrID']        = $row->zef_usrID;

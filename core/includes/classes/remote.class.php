@@ -50,7 +50,7 @@ class Kimai_Remote_Api
 
 		// and remember the most important stuff
 		$this->kga     = $kga;
-		$this->backend = new ApiDatabase($kga, $database);
+		$this->backend = new ApiDatabase($kga);
 		$this->oldDatabase = $database;
 	}
 
@@ -307,15 +307,15 @@ class Kimai_Remote_Api
 
 		$users = $this->getBackend()->get_arr_watchable_users($this->getUser());
 
+		$results = array();
         if (count($users) > 0) {
-			$results = array();
 			foreach ($users as $row) {
 				$results[] = array('user_ID' => $row['usr_ID'], 'usr_name' => $row['usr_name']);
 			}
-			return $this->getSuccessResult($results);
+			
         }
 
-        return $this->getErrorResult();
+        return $this->getSuccessResult($results);
 	}
 
 
@@ -341,16 +341,15 @@ class Kimai_Remote_Api
 		}
 
 		$customers = $this->getBackend()->get_arr_knd($user['groups']);
-
+		$results = array();
+        
         if (count($customers) > 0) {
-			$results = array();
 			foreach ($customers as $row) {
 				$results[] = array('knd_ID' => $row['knd_ID'], 'knd_name' => $row['knd_name']);
 			}
-			return $this->getSuccessResult($results);
         }
-
-        return $this->getErrorResult();
+		
+		return $this->getSuccessResult($results);
 	}
 
     /**
@@ -374,13 +373,22 @@ class Kimai_Remote_Api
 			$projects = $this->getBackend()->get_arr_pct_by_knd($kga['customer']['knd_ID']);
 		} else {
 			$projects = $this->getBackend()->get_arr_pct($user['groups']);
+			
+			// append task Ids
+			// $globalTasks = $this->getBackend()->get_arr_evt_by_pct(null, $user['groups']);
+			foreach($projects as &$project) {
+				$tasks = $this->getBackend()->get_arr_evt_by_pct($project['pct_ID'], $user['groups']);
+				$projectTasks = array();
+				foreach($tasks as $task) {
+					// if(!isset($globalTasks[$task['evt_ID']])) {
+						$projectTasks[] = $task['evt_ID'];
+					// }
+				}
+				$project['taskIds'] = $projectTasks;
+			}
 		}
-
-        if (count($projects) > 0) {
-			return $this->getSuccessResult($projects);
-        }
-
-        return $this->getErrorResult();
+		
+		return $this->getSuccessResult($projects);
 	}
 
 
@@ -430,11 +438,8 @@ class Kimai_Remote_Api
           $tasks = $this->getBackend()->get_arr_evt($user['groups']);
 		}
 
-        if (!empty($tasks)) {
-			return $this->getSuccessResult($tasks);
-        }
-
-        return $this->getErrorResult();
+       
+		return $this->getSuccessResult($tasks);
 	}
 
 	/**
@@ -514,13 +519,13 @@ class Kimai_Remote_Api
 
 		// Get the array of timesheet entries.
 		if (isset($kga['customer'])) {
-		  $arr_zef = $backend->get_arr_zef($in, $out, null, array($kga['customer']['knd_ID']), false, $cleared, $start, $limit);
-		  $totalCount = $backend->get_arr_zef($in, $out, null, array($kga['customer']['knd_ID']), false, $cleared, $start, $limit, true);
-		  return $this->getSuccessResult($arr_zef, $totalCount);
+			$arr_zef = $backend->get_arr_zef($in, $out, null, array($kga['customer']['knd_ID']), false, $cleared, $start, $limit);
+			$totalCount = $backend->get_arr_zef($in, $out, null, array($kga['customer']['knd_ID']), false, $cleared, $start, $limit, true);
+			return $this->getSuccessResult($arr_zef, $totalCount);
 		} else {
-		  $arr_zef = $backend->get_arr_zef($in, $out, array($user['usr_ID']), null, null, null, true, false, $cleared, $start, $limit);
-		  $totalCount = $backend->get_arr_zef($in, $out, array($user['usr_ID']), null, null, null, true, false, $cleared, $start, $limit, true);
-		  return $this->getSuccessResult($arr_zef, $totalCount);
+			$arr_zef = $backend->get_arr_zef($in, $out, array($user['usr_ID']), null, null, null, false, $cleared, $start, $limit);
+			$totalCount = $backend->get_arr_zef($in, $out, array($user['usr_ID']), null, null, null, false, $cleared, $start, $limit, true);
+			return $this->getSuccessResult($arr_zef, $totalCount);
 		}
 		
 		$result = $this->getErrorResult();
@@ -754,7 +759,7 @@ class Kimai_Remote_Api
 		$exp_entry = $backend->get_entry_exp($id);
 		
 		// valid entry?
-		if(!empty($zef_entry)) {
+		if(!empty($exp_entry)) {
 			return $this->getSuccessResult(array($exp_entry));
 		}
 		
@@ -816,8 +821,8 @@ class Kimai_Remote_Api
 		if(isset($record['commentType'])) {
 	    	$data['exp_comment_type'] = (int)$record['commentType'];
 		}
-		if(isset($record['refundable'])) {
-	    	$data['exp_refundable'] = (int)$record['refundable'];
+		if(isset($record['flagRefundable'])) {
+	    	$data['exp_refundable'] = (int)$record['flagRefundable'];
 		}
 		if(isset($record['cleared'])) {
 	    	$data['exp_cleared'] = (int)$record['cleared'];

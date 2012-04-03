@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with Kimai; If not, see <http://www.gnu.org/licenses/>.
  */
-
+require_once('mysqlDatabaseLayer.class.php');
 /**
  * Provides the database layer for remote API calls.
  * This was implemented due to the bad maintainability of MySQL and PDO Classes.
@@ -27,14 +27,13 @@
  */
 class ApiDatabase {
 	private $kga = null;
-	private $tablePrefix = null;
 	private $dbLayer = null;
 	private $conn = null;
 	
-	public function __construct($kga, $database) {
-		$odlDatabaseLayer = $database;
+	public function __construct($kga) {
+		$odlDatabaseLayer = new MySQLDatabaseLayer($kga);
+		$odlDatabaseLayer->connect($kga['server_hostname'], $kga['server_database'], $kga['server_username'], $kga['server_password'], $kga['utf8'], $kga['server_type']);
 		
-		$this->tablePrefix = $kga['server_prefix'];
 		$this->kga = $kga;
 		$this->dbLayer = $odlDatabaseLayer;
 		$this->conn = $this->dbLayer->getConnection();
@@ -45,8 +44,106 @@ class ApiDatabase {
 	}
 	
 	
+	/**********
+	 * Timesheet
+	 */
+	
 	/**
-	 * @TODO: add to PDO
+  	 * returns timesheet for specific user as multidimensional array
+	 * @param integer $user ID of user in table usr
+	 * @param integer $in start of timespace in unix seconds
+	 * @param integer $out end of timespace in unix seconds
+	 * @param integer $filterCleared where -1 (default) means no filtering, 0 means only not cleared entries, 1 means only cleared entries
+	 * @param 
+	 * @return array
+	 * @author Alexander Bauer
+	 */
+	public function get_arr_zef($in, $out, $users = null, $customers = null, $projects = null, $events = null, $reverse_order = false, $filterCleared = null, $startRows = 0, $limitRows = 0, $countOnly = false) {
+		if (!is_numeric($filterCleared)) {
+			$filterCleared = $this->kga['conf']['hideClearedEntries']-1; // 0 gets -1 for disabled, 1 gets 0 for only not cleared entries
+		}
+		
+		$in = MySQL::SQLValue($in, MySQL::SQLVALUE_NUMBER);
+		$out = MySQL::SQLValue($out, MySQL::SQLVALUE_NUMBER);
+		$filterCleared = MySQL::SQLValue($filterCleared , MySQL::SQLVALUE_NUMBER);
+      
+      	$table = $this->getZefTable();
+		$projectTable = $this->getProjectTable();
+		$customerTable = $this->getCustomerTable();
+		$userTable = $this->getUserTable();
+		$statusTable = $this->getStatusTable();
+		$eventTable = $this->getEventTable();
+      	$whereClauses = $this->zef_whereClausesFromFilters($users, $customers, $projects, $events);
+
+		if (isset($this->kga['customer'])) {
+			$whereClauses[] = "$projectTable.pct_internal = 0";
+		}
+
+		if (!empty($in)) {
+        	$whereClauses[]="(zef_in >= $in)";
+		}
+		if (!empty($out)) {
+        	$whereClauses[]="zef_out <= $out || zef_out = 0";
+		}
+	
+		if ($filterCleared > -1) {
+        	$whereClauses[] = "zef_cleared = $filterCleared";
+		}
+      
+		if(!empty($limitRows)) {
+			$startRows = (int)$startRows;
+			$limit = "LIMIT $startRows, $limitRows";
+		} else {
+			$limit = '';
+		}
+      
+		$select = "SELECT zef_ID, zef_in, zef_out, zef_time, zef_rate, zef_fixed_rate, zef_budget, zef_approved, status, zef_billable,
+                       zef_pctID, zef_evtID, zef_usrID, pct_ID, knd_name, pct_kndID, evt_name, pct_comment, pct_name,
+                       zef_location, zef_trackingnr, zef_description, zef_comment, zef_comment_type, usr_name, usr_alias, zef_cleared";
+      
+		if($countOnly) {
+			$select = "SELECT COUNT(*) AS total";
+      		$limit = "";
+      	}
+		                
+		$query = "$select
+                FROM $table
+                JOIN $projectTable ON zef_pctID = pct_ID
+                JOIN $customerTable ON pct_kndID = knd_ID
+                JOIN $userTable ON zef_usrID = usr_ID
+                JOIN $statusTable ON zef_status = status_id
+                JOIN $eventTable ON evt_ID = zef_evtID "
+                .(count($whereClauses)>0?" WHERE ":" ").implode(" AND ",$whereClauses).
+                ' ORDER BY zef_in '.($reverse_order?'ASC ':'DESC ') . $limit.';';
+      
+		$this->conn->Query($query);
+		
+      
+		if($countOnly) {
+			$this->conn->MoveFirst();
+      		$row = $this->conn->Row();
+      		return $row->total;
+      	}
+
+      	$arr = array();
+		$this->conn->MoveFirst();
+		while (!$this->conn->EndOfSeek()) {
+			$row = $this->conn->Row();
+			$rowArray = (array)$row;
+			if ($row->zef_out != 0) {
+				// only calculate time after recording is complete
+				$rowArray['zef_time'] = $rowArray['zef_out'] - $rowArray['zef_in'];
+				$rowArray['zef_duration'] = Format::formatDuration($rowArray['zef_time']);
+                $rowArray['wage_decimal'] = $rowArray['zef_time'] / 3600 * $row->zef_rate;
+				$rowArray['wage'] = sprintf("%01.2f", $rowArray['wage_decimal']);
+			}
+			$arr[] = $rowArray;
+		}
+		
+		return $arr;
+	}
+	
+	/**
 	 * @see zef_create_record 
 	 * @param array $data
 	 */
@@ -167,7 +264,6 @@ class ApiDatabase {
 	
 	/**
 	 * returns expenses for specific user as multidimensional array
-	 * @TODO: needs comments
 	 * @param integer $user ID of user in table usr
 	 * @return array
 	 * @author th
